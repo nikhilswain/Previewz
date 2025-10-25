@@ -95,7 +95,7 @@ export default function SettingsPage() {
       )
     ) {
       // Clear IndexedDB
-      const request = indexedDB.deleteDatabase("PreviewBoardDB");
+      const request = indexedDB.deleteDatabase("PreviewzDB");
       request.onsuccess = () => {
         localStorage.clear();
         toast.message("All data cleared", {
@@ -129,7 +129,7 @@ export default function SettingsPage() {
       <div className="mx-auto max-w-2xl px-4 py-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">Settings</h1>
         <p className="text-muted-foreground mb-8">
-          Manage your PreviewBoard preferences and data
+          Manage your Previewz preferences and data
         </p>
 
         <div className="space-y-8">

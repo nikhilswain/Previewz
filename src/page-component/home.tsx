@@ -1,266 +1,164 @@
-import type React from "react";
-
-import { useState } from "react";
-import { ArrowLeft, Download, Upload, Trash2, Moon, Sun } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
 import { useMediaStore } from "@/hooks/use-media-store";
-import { useEffect } from "react";
+import { AddMediaModal } from "@/components/add-media-modal";
+import { MediaGallery } from "@/components/media-gallery";
+import { CommandPalette } from "@/components/command-pallete";
+import { TagFilter } from "@/components/tag-filter";
+import { LayoutSwitcher } from "@/components/layout-switcher";
+import { Plus, Search, Lock } from "lucide-react";
+import { SettingsButton } from "@/components/settings-button";
+import { FormatFilter } from "@/components/format-filter";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-export default function SettingsPage() {
-  const { items } = useMediaStore();
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [mounted, setMounted] = useState(false);
+export default function HomePage() {
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
+  const { items, allTags, allFormats, hiddenTags } = useMediaStore();
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
-    ).matches;
-    const initialTheme = savedTheme || (prefersDark ? "dark" : "light");
-    setTheme(initialTheme);
-    setMounted(true);
-  }, []);
-
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-
-    const html = document.documentElement;
-    if (newTheme === "dark") {
-      html.classList.add("dark");
-    } else {
-      html.classList.remove("dark");
-    }
-    localStorage.setItem("theme", newTheme);
-    toast.message("Theme updated", {
-      description: `Switched to ${newTheme} mode`,
-    });
-  };
-
-  const handleExport = () => {
-    const dataToExport = {
-      version: "1.0",
-      exportedAt: new Date().toISOString(),
-      items,
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
     };
 
-    const dataStr = JSON.stringify(dataToExport, null, 2);
-    const dataBlob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `previewboard-backup-${Date.now()}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-    toast.message("Export successful", {
-      description: `Exported ${items.length} media items`,
-    });
-  };
+      const text = e.dataTransfer?.getData("text/plain") || "";
+      if (text) {
+        const urls = text
+          .split(/[\n,]/)
+          .map((url) => url.trim())
+          .filter(
+            (url) => url.startsWith("http://") || url.startsWith("https://")
+          );
 
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-
-      if (!data.items || !Array.isArray(data.items)) {
-        throw new Error("Invalid backup file format");
+        if (urls.length > 0) {
+          setIsAddModalOpen(true);
+          sessionStorage.setItem("prefilledUrl", urls[0]);
+        } else {
+          toast.error("No valid URLs found", {
+            description: "Please drop text containing valid URLs",
+          });
+        }
       }
+    };
 
-      // Store imported items in localStorage for the main page to handle
-      sessionStorage.setItem("importedData", JSON.stringify(data.items));
-      window.location.href = "/";
+    document.addEventListener("dragover", handleDragOver);
+    document.addEventListener("drop", handleDrop);
 
-      toast.message("Import started", {
-        description: "Redirecting to add imported items...",
-      });
-    } catch (error) {
-      toast.error("Import failed", {
-        description:
-          error instanceof Error ? error.message : "Failed to import backup",
-      });
-    }
-  };
+    return () => {
+      document.removeEventListener("dragover", handleDragOver);
+      document.removeEventListener("drop", handleDrop);
+    };
+  }, [toast]);
 
-  const handleClearAll = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete all media? This cannot be undone."
-      )
-    ) {
-      // Clear IndexedDB
-      const request = indexedDB.deleteDatabase("PreviewBoardDB");
-      request.onsuccess = () => {
-        localStorage.clear();
-        toast.message("All data cleared", {
-          description: "Your media library has been reset",
-        });
-        window.location.href = "/";
-      };
-      request.onerror = () => {
-        toast.error("Error", {
-          description: "Failed to clear data",
-        });
-      };
-    }
-  };
+  const visibleTags = allTags.filter((tag) => !hiddenTags.includes(tag));
 
-  if (!mounted) return null;
+  const filteredItems = items.filter((item) => {
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.tags.some((tag) =>
+        tag.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+    const matchesTags =
+      selectedTags.length === 0 ||
+      selectedTags.some((tag) => item.tags.includes(tag));
+
+    const matchesFormats =
+      selectedFormats.length === 0 || selectedFormats.includes(item.format);
+
+    const hasHiddenTag = item.tags.some((tag) => hiddenTags.includes(tag));
+
+    return matchesSearch && matchesTags && matchesFormats && !hasHiddenTag;
+  });
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="sticky top-0 z-40 border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-        <div className="mx-auto max-w-2xl px-4 py-4">
-          <a href="/">
-            <Button variant="ghost" size="sm" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          </a>
-        </div>
-      </div>
+      <CommandPalette
+        items={items}
+        onSearch={setSearchQuery}
+        searchQuery={searchQuery}
+      />
 
-      <div className="mx-auto max-w-2xl px-4 py-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Settings</h1>
-        <p className="text-muted-foreground mb-8">
-          Manage your PreviewBoard preferences and data
-        </p>
-
-        <div className="space-y-8">
-          {/* Theme Settings */}
-          <div className="rounded-lg border border-border/40 p-6">
-            <h2 className="text-xl font-semibold text-foreground mb-4">
-              Appearance
-            </h2>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-foreground">Theme</p>
-                <p className="text-sm text-muted-foreground">
-                  Choose between light and dark mode
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleTheme}
-                className="gap-2 bg-transparent"
-              >
-                {theme === "light" ? (
-                  <>
-                    <Moon className="h-4 w-4" />
-                    Dark
-                  </>
-                ) : (
-                  <>
-                    <Sun className="h-4 w-4" />
-                    Light
-                  </>
-                )}
-              </Button>
+      <div className="sticky top-0 z-40 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="mx-auto max-w-7xl px-4 py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-foreground">
+                Previewz
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Your personal media library
+              </p>
             </div>
-          </div>
-
-          {/* Data Management */}
-          <div className="rounded-lg border border-border/40 p-6">
-            <h2 className="text-xl font-semibold text-foreground mb-4">
-              Data Management
-            </h2>
-            <div className="space-y-4">
-              {/* Export */}
-              <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div>
-                  <p className="font-medium text-foreground">Export Data</p>
-                  <p className="text-sm text-muted-foreground">
-                    Download all your media as a JSON backup
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExport}
-                  className="gap-2 bg-transparent"
-                >
-                  <Download className="h-4 w-4" />
-                  Export
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-none sm:w-64">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <input
+                  placeholder="Search... (Ctrl+K)"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-md bg-muted/50 border border-muted-foreground/20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+              <a href="/hidden">
+                <Button variant="outline" size="icon" title="Hidden Vault">
+                  <Lock className="h-4 w-4" />
                 </Button>
-              </div>
-
-              {/* Import */}
-              <div className="flex items-center justify-between pb-4 border-b border-border/40">
-                <div>
-                  <p className="font-medium text-foreground">Import Data</p>
-                  <p className="text-sm text-muted-foreground">
-                    Restore media from a previous backup
-                  </p>
-                </div>
-                <label>
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={handleImport}
-                    className="hidden"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 cursor-pointer bg-transparent"
-                    asChild
-                  >
-                    <span>
-                      <Upload className="h-4 w-4" />
-                      Import
-                    </span>
-                  </Button>
-                </label>
-              </div>
-
-              {/* Clear All */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Clear All Data</p>
-                  <p className="text-sm text-muted-foreground">
-                    Delete all media permanently
-                  </p>
-                </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleClearAll}
-                  className="gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Clear
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Info */}
-          <div className="rounded-lg border border-border/40 p-6">
-            <h2 className="text-xl font-semibold text-foreground mb-4">
-              Library Info
-            </h2>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Media Items</span>
-                <span className="font-medium text-foreground">
-                  {items.length}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Storage Used</span>
-                <span className="font-medium text-foreground">IndexedDB</span>
-              </div>
+              </a>
+              <SettingsButton />
             </div>
           </div>
         </div>
       </div>
+
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        <div className="mb-8 flex flex-col gap-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <LayoutSwitcher />
+          </div>
+
+          <div className="flex flex-col gap-4">
+            {visibleTags.length > 0 && (
+              <TagFilter
+                tags={visibleTags}
+                selectedTags={selectedTags}
+                onTagChange={setSelectedTags}
+              />
+            )}
+            {allFormats.length > 0 && (
+              <FormatFilter
+                formats={allFormats}
+                selectedFormats={selectedFormats}
+                onFormatChange={setSelectedFormats}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Gallery */}
+        <MediaGallery items={filteredItems} />
+      </div>
+
+      <button
+        onClick={() => setIsAddModalOpen(true)}
+        className="fixed bottom-8 right-8 h-16 w-16 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-50"
+        aria-label="Add media"
+      >
+        <Plus className="h-7 w-7" />
+      </button>
+
+      {/* Add Media Modal */}
+      <AddMediaModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+      />
     </div>
   );
 }

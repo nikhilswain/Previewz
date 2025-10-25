@@ -1,0 +1,13 @@
+---
+import { ThemeProvider } from '@/components/theme-provider';
+import Layout from '../layouts/Layout.astro';
+import HomePage  from "@/page-component/home";
+import { Toaster} from "sonner"
+---
+
+<Layout>
+	<ThemeProvider client:only="react">
+		<HomePage client:only="react" />
+		<Toaster richColors client:only="react" /> 
+	</ThemeProvider>
+</Layout>

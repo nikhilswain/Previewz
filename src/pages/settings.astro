@@ -1,9 +1,13 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { Toaster} from "sonner"
+import SettingsPage from '@/page-component/settings';
+import { ThemeProvider } from '@/components/theme-provider';
 ---
 
 <Layout>
-	<h1 class="text-blue-500 text-2xl">Zero Two</h1>
-	<Toaster richColors client:only="react" /> 
+  <ThemeProvider client:only="react">
+    <SettingsPage client:only="react" />
+    <Toaster richColors client:only="react" /> 
+  </ThemeProvider>
 </Layout>

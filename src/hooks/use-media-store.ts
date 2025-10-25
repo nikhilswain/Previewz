@@ -59,7 +59,7 @@ function detectFormat(
   return "other";
 }
 
-const DB_NAME = "PreviewBoardDB";
+const DB_NAME = "PreviewzDB";
 const STORE_NAME = "media";
 const HIDDEN_STORE_NAME = "hidden";
 
