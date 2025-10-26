@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { create } from "zustand";
 
 export interface MediaItem {
   id: string;
@@ -62,165 +62,129 @@ function detectFormat(
 const DB_NAME = "PreviewzDB";
 const STORE_NAME = "media";
 const HIDDEN_STORE_NAME = "hidden";
+type MediaStore = {
+  items: MediaItem[];
+  hiddenItems: MediaItem[];
+  hiddenTags: string[];
+  isLoading: boolean;
+  allTags: string[];
+  allFormats: string[];
+  // actions
+  addItem: (
+    item: Omit<MediaItem, "id" | "createdAt" | "format">
+  ) => Promise<void>;
+  deleteItem: (id: string) => Promise<void>;
+  updateItem: (
+    id: string,
+    updates: Partial<Omit<MediaItem, "id" | "createdAt">>
+  ) => Promise<void>;
+  hideItem: (id: string) => Promise<void>;
+  unhideItem: (id: string) => Promise<void>;
+  hideTag: (tag: string) => void;
+  unhideTag: (tag: string) => void;
+};
 
-export function useMediaStore() {
-  const [items, setItems] = useState<MediaItem[]>([]);
-  const [hiddenItems, setHiddenItems] = useState<MediaItem[]>([]);
-  const [hiddenTags, setHiddenTags] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [db, setDb] = useState<IDBDatabase | null>(null);
+// Module-level DB singleton to avoid re-opening and re-running effects
+let dbInstance: IDBDatabase | null = null;
+let initializing = false;
 
-  // Initialize IndexedDB
-  useEffect(() => {
-    const initDB = async () => {
-      return new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, 2);
+function openDB(): Promise<IDBDatabase> {
+  if (dbInstance) return Promise.resolve(dbInstance);
+  if (typeof window === "undefined")
+    return Promise.reject(new Error("No window"));
 
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 2);
 
-        request.onupgradeneeded = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result;
-          if (!db.objectStoreNames.contains(STORE_NAME)) {
-            db.createObjectStore(STORE_NAME, { keyPath: "id" });
-          }
-          if (!db.objectStoreNames.contains(HIDDEN_STORE_NAME)) {
-            db.createObjectStore(HIDDEN_STORE_NAME, { keyPath: "id" });
-          }
-        };
-      });
-    };
-
-    initDB()
-      .then((database) => {
-        setDb(database);
-        loadItems(database);
-        loadHiddenItems(database);
-        loadHiddenTags();
-      })
-      .catch(console.error);
-  }, []);
-
-  const loadItems = useCallback((database: IDBDatabase) => {
-    const transaction = database.transaction(STORE_NAME, "readonly");
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.getAll();
-
+    request.onerror = () => reject(request.error);
     request.onsuccess = () => {
-      setItems(request.result.sort((a, b) => b.createdAt - a.createdAt));
-      setIsLoading(false);
+      dbInstance = request.result;
+      resolve(dbInstance);
     };
-  }, []);
-
-  const loadHiddenItems = useCallback((database: IDBDatabase) => {
-    const transaction = database.transaction(HIDDEN_STORE_NAME, "readonly");
-    const store = transaction.objectStore(HIDDEN_STORE_NAME);
-    const request = store.getAll();
-
-    request.onsuccess = () => {
-      setHiddenItems(request.result.sort((a, b) => b.createdAt - a.createdAt));
-    };
-  }, []);
-
-  const loadHiddenTags = useCallback(() => {
-    const tags = localStorage.getItem("hiddenTags");
-    if (tags) {
-      setHiddenTags(JSON.parse(tags));
-    }
-  }, []);
-
-  const hideItem = useCallback(
-    async (id: string) => {
-      if (!db) return;
-
-      const itemToHide = items.find((item) => item.id === id);
-      if (!itemToHide) return;
-
-      const hiddenItem = { ...itemToHide, isHidden: true };
-
-      setItems((prev) => prev.filter((item) => item.id !== id));
-      setHiddenItems((prev) => [hiddenItem, ...prev]);
-
-      return new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction(
-          [STORE_NAME, HIDDEN_STORE_NAME],
-          "readwrite"
-        );
-        const store = transaction.objectStore(STORE_NAME);
-        const hiddenStore = transaction.objectStore(HIDDEN_STORE_NAME);
-
-        const deleteRequest = store.delete(id);
-        const addRequest = hiddenStore.add(hiddenItem);
-
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => {
-          loadItems(db);
-          loadHiddenItems(db);
-          reject(transaction.error);
-        };
-      });
-    },
-    [db, items, loadItems, loadHiddenItems]
-  );
-
-  const unhideItem = useCallback(
-    async (id: string) => {
-      if (!db) return;
-
-      const itemToUnhide = hiddenItems.find((item) => item.id === id);
-      if (!itemToUnhide) return;
-
-      const restoredItem = { ...itemToUnhide, isHidden: false };
-
-      setHiddenItems((prev) => prev.filter((item) => item.id !== id));
-      setItems((prev) => [restoredItem, ...prev]);
-
-      return new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction(
-          [STORE_NAME, HIDDEN_STORE_NAME],
-          "readwrite"
-        );
-        const store = transaction.objectStore(STORE_NAME);
-        const hiddenStore = transaction.objectStore(HIDDEN_STORE_NAME);
-
-        const addRequest = store.add(restoredItem);
-        const deleteRequest = hiddenStore.delete(id);
-
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => {
-          loadItems(db);
-          loadHiddenItems(db);
-          reject(transaction.error);
-        };
-      });
-    },
-    [db, hiddenItems, loadItems, loadHiddenItems]
-  );
-
-  const hideTag = useCallback((tag: string) => {
-    setHiddenTags((prev) => {
-      const updated = [...prev, tag];
-      localStorage.setItem("hiddenTags", JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
-
-  const unhideTag = useCallback((tag: string) => {
-    setHiddenTags((prev) => {
-      const updated = prev.filter((t) => t !== tag);
-      localStorage.setItem("hiddenTags", JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
-
-  const addItem = useCallback(
-    async (item: Omit<MediaItem, "id" | "createdAt" | "format">) => {
-      if (!db) {
-        return Promise.reject(new Error("Database not initialized"));
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: "id" });
       }
+      if (!db.objectStoreNames.contains(HIDDEN_STORE_NAME)) {
+        db.createObjectStore(HIDDEN_STORE_NAME, { keyPath: "id" });
+      }
+    };
+  });
+}
 
+async function loadFromDB(): Promise<{
+  items: MediaItem[];
+  hiddenItems: MediaItem[];
+  hiddenTags: string[];
+}> {
+  const db = await openDB();
+  const [items, hiddenItems] = await Promise.all([
+    new Promise<MediaItem[]>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const result = (req.result as MediaItem[]).sort(
+          (a, b) => b.createdAt - a.createdAt
+        );
+        resolve(result);
+      };
+      req.onerror = () => reject(req.error);
+    }),
+    new Promise<MediaItem[]>((resolve, reject) => {
+      const tx = db.transaction(HIDDEN_STORE_NAME, "readonly");
+      const store = tx.objectStore(HIDDEN_STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const result = (req.result as MediaItem[]).sort(
+          (a, b) => b.createdAt - a.createdAt
+        );
+        resolve(result);
+      };
+      req.onerror = () => reject(req.error);
+    }),
+  ]);
+
+  const tagsRaw =
+    typeof window !== "undefined" ? localStorage.getItem("hiddenTags") : null;
+  const hiddenTags = tagsRaw ? (JSON.parse(tagsRaw) as string[]) : [];
+
+  return { items, hiddenItems, hiddenTags };
+}
+
+function computeDerived(items: MediaItem[]) {
+  const allTags = Array.from(new Set(items.flatMap((i) => i.tags))).sort();
+  const allFormats = Array.from(new Set(items.map((i) => i.format))).sort();
+  return { allTags, allFormats };
+}
+
+export const useMediaStore = create<MediaStore>((set, get) => {
+  // kick off async init once in the browser
+  if (typeof window !== "undefined" && !initializing && !dbInstance) {
+    initializing = true;
+    loadFromDB()
+      .then(({ items, hiddenItems, hiddenTags }) => {
+        const derived = computeDerived(items);
+        set({ items, hiddenItems, hiddenTags, isLoading: false, ...derived });
+      })
+      .catch(() => set({ isLoading: false }))
+      .finally(() => {
+        initializing = false;
+      });
+  }
+
+  return {
+    items: [],
+    hiddenItems: [],
+    hiddenTags: [],
+    isLoading: true,
+    allTags: [],
+    allFormats: [],
+
+    addItem: async (item) => {
+      const db = await openDB();
       const format = detectFormat(item.url, item.type);
-
       const newItem: MediaItem = {
         ...item,
         format,
@@ -228,101 +192,151 @@ export function useMediaStore() {
         createdAt: Date.now(),
       };
 
-      setItems((prev) => [newItem, ...prev]);
+      // optimistic update
+      const prevItems = get().items;
+      const optimistic = [newItem, ...prevItems];
+      set({ items: optimistic, ...computeDerived(optimistic) });
 
-      return new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction(STORE_NAME, "readwrite");
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.add(newItem);
-
-        request.onsuccess = () => {
-          resolve();
-        };
-        request.onerror = () => {
-          setItems((prev) => prev.filter((item) => item.id !== newItem.id));
-          reject(request.error);
-        };
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.add(newItem);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }).catch((err) => {
+        // rollback on failure
+        const rolledBack = get().items.filter((i) => i.id !== newItem.id);
+        set({ items: rolledBack, ...computeDerived(rolledBack) });
+        throw err;
       });
     },
-    [db]
-  );
 
-  const deleteItem = useCallback(
-    async (id: string) => {
-      if (!db) return;
+    deleteItem: async (id) => {
+      const db = await openDB();
+      const prev = get().items;
+      const updated = prev.filter((i) => i.id !== id);
+      set({ items: updated, ...computeDerived(updated) });
 
-      setItems((prev) => prev.filter((item) => item.id !== id));
-
-      return new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction(STORE_NAME, "readwrite");
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.delete(id);
-
-        request.onsuccess = () => {
-          resolve();
-        };
-        request.onerror = () => {
-          loadItems(db);
-          reject(request.error);
-        };
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }).catch((err) => {
+        // reload from DB on failure
+        loadFromDB()
+          .then(({ items, hiddenItems, hiddenTags }) => {
+            set({ items, hiddenItems, hiddenTags, ...computeDerived(items) });
+          })
+          .catch(() => {});
+        throw err;
       });
     },
-    [db, loadItems]
-  );
 
-  const updateItem = useCallback(
-    async (
-      id: string,
-      updates: Partial<Omit<MediaItem, "id" | "createdAt">>
-    ) => {
-      if (!db) return;
+    updateItem: async (id, updates) => {
+      const db = await openDB();
+      const current = get().items;
+      const target = current.find((i) => i.id === id);
+      if (!target) return;
 
-      const itemToUpdate = items.find((item) => item.id === id);
-      if (!itemToUpdate) return;
+      const updatedItem: MediaItem = { ...target, ...updates };
+      const next = current.map((i) => (i.id === id ? updatedItem : i));
+      set({ items: next, ...computeDerived(next) });
 
-      const updatedItem = { ...itemToUpdate, ...updates };
-      setItems((prev) =>
-        prev.map((item) => (item.id === id ? updatedItem : item))
-      );
-
-      return new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction(STORE_NAME, "readwrite");
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.put(updatedItem);
-
-        request.onsuccess = () => {
-          resolve();
-        };
-        request.onerror = () => {
-          loadItems(db);
-          reject(request.error);
-        };
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.put(updatedItem);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }).catch((err) => {
+        loadFromDB()
+          .then(({ items, hiddenItems, hiddenTags }) => {
+            set({ items, hiddenItems, hiddenTags, ...computeDerived(items) });
+          })
+          .catch(() => {});
+        throw err;
       });
     },
-    [db, items, loadItems]
-  );
 
-  const allTags = Array.from(
-    new Set(items.flatMap((item) => item.tags))
-  ).sort();
+    hideItem: async (id) => {
+      const db = await openDB();
+      const state = get();
+      const item = state.items.find((i) => i.id === id);
+      if (!item) return;
+      const hiddenItem: MediaItem = { ...item, isHidden: true };
 
-  const allFormats = Array.from(
-    new Set(items.map((item) => item.format))
-  ).sort();
+      const newItems = state.items.filter((i) => i.id !== id);
+      const newHidden = [hiddenItem, ...state.hiddenItems];
+      set({
+        items: newItems,
+        hiddenItems: newHidden,
+        ...computeDerived(newItems),
+      });
 
-  return {
-    items,
-    hiddenItems,
-    hiddenTags,
-    isLoading,
-    addItem,
-    deleteItem,
-    updateItem,
-    hideItem,
-    unhideItem,
-    hideTag,
-    unhideTag,
-    allTags,
-    allFormats,
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME, HIDDEN_STORE_NAME], "readwrite");
+        tx.objectStore(STORE_NAME).delete(id);
+        tx.objectStore(HIDDEN_STORE_NAME).add(hiddenItem);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }).catch((err) => {
+        // reload on failure
+        loadFromDB()
+          .then(({ items, hiddenItems, hiddenTags }) => {
+            set({ items, hiddenItems, hiddenTags, ...computeDerived(items) });
+          })
+          .catch(() => {});
+        throw err;
+      });
+    },
+
+    unhideItem: async (id) => {
+      const db = await openDB();
+      const state = get();
+      const item = state.hiddenItems.find((i) => i.id === id);
+      if (!item) return;
+      const unhidden: MediaItem = { ...item, isHidden: false };
+
+      const newHidden = state.hiddenItems.filter((i) => i.id !== id);
+      const newItems = [unhidden, ...state.items];
+      set({
+        items: newItems,
+        hiddenItems: newHidden,
+        ...computeDerived(newItems),
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME, HIDDEN_STORE_NAME], "readwrite");
+        tx.objectStore(STORE_NAME).add(unhidden);
+        tx.objectStore(HIDDEN_STORE_NAME).delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }).catch((err) => {
+        loadFromDB()
+          .then(({ items, hiddenItems, hiddenTags }) => {
+            set({ items, hiddenItems, hiddenTags, ...computeDerived(items) });
+          })
+          .catch(() => {});
+        throw err;
+      });
+    },
+
+    hideTag: (tag: string) => {
+      const updated = [...get().hiddenTags, tag];
+      if (typeof window !== "undefined") {
+        localStorage.setItem("hiddenTags", JSON.stringify(updated));
+      }
+      set({ hiddenTags: updated });
+    },
+
+    unhideTag: (tag: string) => {
+      const updated = get().hiddenTags.filter((t) => t !== tag);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("hiddenTags", JSON.stringify(updated));
+      }
+      set({ hiddenTags: updated });
+    },
   };
-}
+});

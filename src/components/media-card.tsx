@@ -1,6 +1,6 @@
 import type React from "react";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { type MediaItem, useMediaStore } from "@/hooks/use-media-store";
 import type { LayoutType } from "@/hooks/use-layout-store";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,8 @@ interface MediaCardProps {
 export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
   const { deleteItem, hideItem } = useMediaStore();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [validThumbnail, setValidThumbnail] = useState<string | null>(null);
 
   const thumbnailUrl =
     item.format === "image"
@@ -70,6 +72,23 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
     }
   };
 
+  useEffect(() => {
+    if (!thumbnailUrl) return;
+
+    const img = new Image();
+    img.src = thumbnailUrl;
+
+    img.onload = () => {
+      setValidThumbnail(thumbnailUrl);
+      setIsLoaded(true);
+    };
+
+    img.onerror = () => {
+      setValidThumbnail(null);
+      setIsLoaded(true);
+    };
+  }, [thumbnailUrl]);
+
   if (layout === "grid") {
     return (
       <div
@@ -78,26 +97,32 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
       >
         <div className="aspect-square overflow-hidden bg-muted relative">
           {item.format === "image" && thumbnailUrl ? (
-            <img
-              src={thumbnailUrl || "/placeholder.svg"}
-              alt={item.name}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              crossOrigin="anonymous"
-              onError={(e) => {
-                e.currentTarget.src = "/media-placeholder.jpg";
-              }}
-            />
+            validThumbnail && (
+              <img
+                src={validThumbnail || "/placeholder.svg"}
+                alt={item.name}
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/media-placeholder.png";
+                }}
+              />
+            )
           ) : item.format === "website" ? (
             <iframe
               src={item.url}
               className="h-full w-full pointer-events-none"
-              sandbox="allow-same-origin"
+              sandbox={
+                item.format === "website" ? undefined : "allow-same-origin"
+              }
               onError={() => {
                 console.error("Failed to load iframe");
               }}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+            <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-primary/20 to-secondary/20">
               <div className="text-5xl">
                 {item.format === "video" ? "▶" : "📎"}
               </div>
@@ -184,15 +209,19 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
         onClick={onClick}
       >
         {item.format === "image" && thumbnailUrl ? (
-          <img
-            src={thumbnailUrl || "/placeholder.svg"}
-            alt={item.name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            crossOrigin="anonymous"
-            onError={(e) => {
-              e.currentTarget.src = "/media-placeholder.jpg";
-            }}
-          />
+          validThumbnail && (
+            <img
+              src={validThumbnail || "/placeholder.svg"}
+              alt={item.name}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+              decoding="async"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/media-placeholder.png";
+              }}
+            />
+          )
         ) : item.format === "website" ? (
           <iframe
             src={item.url}
@@ -203,7 +232,7 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
             }}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+          <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-primary/20 to-secondary/20">
             <div className="text-6xl">
               {item.format === "video" ? "▶" : "📎"}
             </div>
@@ -211,14 +240,14 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
         )}
 
         {/* Top gradient overlay with title */}
-        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/60 via-black/30 to-transparent p-3">
+        <div className="absolute top-0 left-0 right-0 bg-linear-to-b from-black/60 via-black/30 to-transparent p-3">
           <h3 className="font-semibold text-sm text-white line-clamp-2">
             {item.name}
           </h3>
         </div>
 
         {/* Bottom gradient overlay with tags */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent p-3">
+        <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/60 via-black/30 to-transparent p-3">
           <div className="flex flex-wrap gap-1">
             {item.tags.slice(0, 1).map((tag) => (
               <Badge
@@ -299,15 +328,19 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
       >
         <div className="bg-muted">
           {item.format === "image" && thumbnailUrl ? (
-            <img
-              src={thumbnailUrl || "/placeholder.svg"}
-              alt={item.name}
-              className="w-full h-auto transition-transform duration-300 group-hover:scale-105"
-              crossOrigin="anonymous"
-              onError={(e) => {
-                e.currentTarget.src = "/media-placeholder.jpg";
-              }}
-            />
+            validThumbnail && (
+              <img
+                src={validThumbnail || "/placeholder.svg"}
+                alt={item.name}
+                className="w-full h-auto transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+                decoding="async"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/media-placeholder.png";
+                }}
+              />
+            )
           ) : item.format === "website" ? (
             <iframe
               src={item.url}
@@ -318,7 +351,7 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
               }}
             />
           ) : (
-            <div className="flex h-96 w-full items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+            <div className="flex h-96 w-full items-center justify-center bg-linear-to-br from-primary/20 to-secondary/20">
               <div className="text-8xl">
                 {item.format === "video" ? "▶" : "📎"}
               </div>
@@ -336,15 +369,19 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
       onClick={onClick}
     >
       {item.format === "image" && thumbnailUrl ? (
-        <img
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={item.name}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          crossOrigin="anonymous"
-          onError={(e) => {
-            e.currentTarget.src = "/media-placeholder.jpg";
-          }}
-        />
+        validThumbnail && (
+          <img
+            src={validThumbnail || "/placeholder.svg"}
+            alt={item.name}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+            decoding="async"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "/media-placeholder.png";
+            }}
+          />
+        )
       ) : item.format === "website" ? (
         <iframe
           src={item.url}
@@ -355,7 +392,7 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
           }}
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+        <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-primary/20 to-secondary/20">
           <div className="text-6xl">{item.format === "video" ? "▶" : "📎"}</div>
         </div>
       )}

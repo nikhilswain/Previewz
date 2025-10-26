@@ -55,7 +55,7 @@ export default function HomePage() {
       document.removeEventListener("dragover", handleDragOver);
       document.removeEventListener("drop", handleDrop);
     };
-  }, [toast]);
+  }, []);
 
   const visibleTags = allTags.filter((tag) => !hiddenTags.includes(tag));
 
@@ -86,7 +86,7 @@ export default function HomePage() {
         searchQuery={searchQuery}
       />
 
-      <div className="sticky top-0 z-40 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="sticky top-0 z-40 border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
         <div className="mx-auto max-w-7xl px-4 py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
