@@ -35,7 +35,7 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
   const handleCopyUrl = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard.writeText(item.url);
-    toast.message("Copied!", { description: "Media URL copied to clipboard" });
+    toast.success("Copied!", { description: "Media URL copied to clipboard" });
   };
 
   const handleDelete = async (e: React.MouseEvent) => {
@@ -43,7 +43,7 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
     setIsDeleting(true);
     try {
       await deleteItem(item.id);
-      toast.message("Deleted!", { description: "Media removed" });
+      toast.success("Deleted!", { description: "Media removed" });
     } catch {
       toast.error("Error", { description: "Failed to delete media" });
     } finally {
@@ -55,7 +55,7 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
     e.stopPropagation();
     try {
       await hideItem(item.id);
-      toast.message("Hidden!", { description: "Media moved to hidden vault" });
+      toast.success("Hidden!", { description: "Media moved to hidden vault" });
     } catch {
       toast.error("Error", { description: "Failed to hide media" });
     }

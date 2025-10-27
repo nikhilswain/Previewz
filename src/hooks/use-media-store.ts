@@ -12,6 +12,14 @@ export interface MediaItem {
   isHidden?: boolean;
 }
 
+// Shape accepted when importing from backups. 'format' is recomputed on import.
+type ImportableMedia = Partial<
+  Pick<
+    MediaItem,
+    "id" | "url" | "type" | "name" | "tags" | "thumbnail" | "createdAt"
+  >
+>;
+
 function detectFormat(
   url: string,
   type: string
@@ -73,6 +81,10 @@ type MediaStore = {
   addItem: (
     item: Omit<MediaItem, "id" | "createdAt" | "format">
   ) => Promise<void>;
+  // Bulk import items (e.g., from backup). Returns counts of added/skipped
+  importItems: (
+    incoming: ImportableMedia[]
+  ) => Promise<{ added: number; skipped: number }>;
   deleteItem: (id: string) => Promise<void>;
   updateItem: (
     id: string,
@@ -82,6 +94,7 @@ type MediaStore = {
   unhideItem: (id: string) => Promise<void>;
   hideTag: (tag: string) => void;
   unhideTag: (tag: string) => void;
+  closeDB: () => void;
 };
 
 // Module-level DB singleton to avoid re-opening and re-running effects
@@ -211,6 +224,118 @@ export const useMediaStore = create<MediaStore>((set, get) => {
       });
     },
 
+    importItems: async (incoming) => {
+      if (!incoming || incoming.length === 0) return { added: 0, skipped: 0 };
+      const db = await openDB();
+
+      // Load existing items once for duplicate detection
+      const existing = await new Promise<MediaItem[]>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result as MediaItem[]);
+        req.onerror = () => reject(req.error);
+      });
+
+      const existingByUrl = new Set(
+        existing.map((i) => (i.url || "").trim().toLowerCase())
+      );
+      const existingById = new Set(existing.map((i) => i.id));
+
+      const toAdd: MediaItem[] = [];
+      for (const raw of incoming) {
+        // Validate URL
+        const url = typeof raw.url === "string" ? raw.url : "";
+        if (!url) continue;
+
+        const urlKey = url.trim().toLowerCase();
+        if (existingByUrl.has(urlKey)) continue; // duplicate by URL
+
+        // Normalize type
+        const typeCandidate = raw.type;
+        const type: MediaItem["type"] =
+          typeCandidate === "image" ||
+          typeCandidate === "video" ||
+          typeCandidate === "other"
+            ? typeCandidate
+            : "other";
+
+        // Compute format from URL + type
+        const format = detectFormat(url, type);
+
+        // Name fallback to hostname
+        let name: string;
+        if (typeof raw.name === "string" && raw.name.trim()) {
+          name = raw.name;
+        } else {
+          try {
+            name = new URL(url).hostname;
+          } catch {
+            name = "Untitled";
+          }
+        }
+
+        // ID handling with collision avoidance
+        let id: string;
+        if (typeof raw.id === "string" && raw.id.trim()) {
+          id = raw.id;
+        } else {
+          id = Date.now().toString() + Math.random().toString(36).slice(2);
+        }
+        if (existingById.has(id)) {
+          id = Date.now().toString() + Math.random().toString(36).slice(2);
+        }
+
+        const createdAt =
+          typeof raw.createdAt === "number" ? raw.createdAt : Date.now();
+
+        const tags = Array.isArray(raw.tags)
+          ? raw.tags.filter((t): t is string => typeof t === "string")
+          : [];
+
+        const thumbnail =
+          typeof raw.thumbnail === "string" ? raw.thumbnail : undefined;
+
+        const item: MediaItem = {
+          id,
+          url,
+          type,
+          format,
+          name,
+          tags,
+          thumbnail,
+          createdAt,
+          isHidden: false,
+        };
+
+        // Track duplicates to prevent re-adding within same batch
+        existingByUrl.add(urlKey);
+        existingById.add(item.id);
+        toAdd.push(item);
+      }
+
+      if (toAdd.length === 0) return { added: 0, skipped: incoming.length };
+
+      // Single transaction for all inserts
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        for (const item of toAdd) {
+          store.add(item);
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+
+      // Update in-memory state
+      const next = [...toAdd, ...get().items].sort(
+        (a, b) => b.createdAt - a.createdAt
+      );
+      set({ items: next, ...computeDerived(next) });
+
+      return { added: toAdd.length, skipped: incoming.length - toAdd.length };
+    },
+
     deleteItem: async (id) => {
       const db = await openDB();
       const prev = get().items;
@@ -337,6 +462,13 @@ export const useMediaStore = create<MediaStore>((set, get) => {
         localStorage.setItem("hiddenTags", JSON.stringify(updated));
       }
       set({ hiddenTags: updated });
+    },
+
+    closeDB: () => {
+      if (dbInstance) {
+        dbInstance.close();
+        dbInstance = null;
+      }
     },
   };
 });

@@ -19,6 +19,37 @@ export default function HomePage() {
   const { items, allTags, allFormats, hiddenTags } = useMediaStore();
 
   useEffect(() => {
+    // Process import data passed from settings page (sessionStorage)
+    try {
+      const raw = sessionStorage.getItem("importedData");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          // call bulk import on the store
+          useMediaStore
+            .getState()
+            .importItems(parsed)
+            .then(({ added, skipped }) => {
+              toast.success("Import complete", {
+                description: `${added} added, ${skipped} skipped`,
+              });
+            })
+            .catch(() => {
+              toast.error("Import failed", {
+                description: "Could not import items",
+              });
+            })
+            .finally(() => {
+              sessionStorage.removeItem("importedData");
+            });
+        } else {
+          sessionStorage.removeItem("importedData");
+        }
+      }
+    } catch {
+      sessionStorage.removeItem("importedData");
+    }
+
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();

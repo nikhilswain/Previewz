@@ -28,7 +28,7 @@ export function PreviewModal({
 
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(item.url);
-    toast.message("Copied!", {
+    toast.success("Copied!", {
       description: "Media URL copied to clipboard",
     });
   };
@@ -37,12 +37,12 @@ export function PreviewModal({
     setIsDeleting(true);
     try {
       await deleteItem(item.id);
-      toast.message("Deleted", {
+      toast.success("Deleted", {
         description: "Media removed from your collection",
       });
       onClose();
     } catch (error) {
-      toast.message("Error", {
+      toast.success("Error", {
         description: "Failed to delete media",
       });
     } finally {
