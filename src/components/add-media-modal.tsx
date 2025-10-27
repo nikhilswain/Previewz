@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { detectMediaTypeFromUrl } from "@/lib/utils";
 
 interface AddMediaModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export function AddMediaModal({ isOpen, onClose }: AddMediaModalProps) {
   const [url, setUrl] = useState("");
   const [name, setName] = useState("");
   const [type, setType] = useState<"image" | "video" | "other">("image");
+  const [typeTouched, setTypeTouched] = useState(false);
   const [tagsInput, setTagsInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -41,10 +43,20 @@ export function AddMediaModal({ isOpen, onClose }: AddMediaModalProps) {
       const prefilledUrl = sessionStorage.getItem("prefilledUrl");
       if (prefilledUrl) {
         setUrl(prefilledUrl);
+        if (!typeTouched) {
+          setType(detectMediaTypeFromUrl(prefilledUrl));
+        }
         sessionStorage.removeItem("prefilledUrl");
       }
     }
   }, [isOpen]);
+
+  // When user edits the URL, auto-detect type unless they manually changed type
+  useEffect(() => {
+    if (!typeTouched && url.trim()) {
+      setType(detectMediaTypeFromUrl(url.trim()));
+    }
+  }, [url, typeTouched]);
 
   const handleTagsInputChange = (value: string) => {
     setTagsInput(value);
@@ -176,7 +188,13 @@ export function AddMediaModal({ isOpen, onClose }: AddMediaModalProps) {
 
           <div className="space-y-2">
             <Label htmlFor="type">Media Type</Label>
-            <Select value={type} onValueChange={(value: any) => setType(value)}>
+            <Select
+              value={type}
+              onValueChange={(value: any) => {
+                setType(value);
+                setTypeTouched(true);
+              }}
+            >
               <SelectTrigger id="type">
                 <SelectValue />
               </SelectTrigger>
