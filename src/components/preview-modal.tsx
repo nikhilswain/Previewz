@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Copy, Trash2, X, FileText, Lock, LockOpen } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Video } from "@/components/video-preview";
 
 interface PreviewModalProps {
   item: MediaItem;
@@ -71,8 +72,8 @@ export function PreviewModal({
   };
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
+    <Dialog open={true} onOpenChange={onClose} key={item.id}>
+      <DialogContent className="max-w-4xl w-3xl">
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -81,14 +82,6 @@ export function PreviewModal({
                 {item.url}
               </p>
             </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onClose}
-              className="h-6 w-6 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
         </DialogHeader>
 
@@ -105,10 +98,10 @@ export function PreviewModal({
                 }}
               />
             ) : item.type === "video" ? (
-              <video
+              <Video
                 src={item.url}
-                controls
-                className="max-h-96 max-w-full rounded"
+                title={item.name}
+                className="max-h-96 max-w-full rounded w-full h-96"
               />
             ) : item.format === "website" ? (
               <div className="w-full space-y-2">

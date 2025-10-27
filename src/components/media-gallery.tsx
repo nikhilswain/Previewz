@@ -21,6 +21,7 @@ export function MediaGallery({ items, isHidden = false }: MediaGalleryProps) {
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
   const { layout } = useLayoutStore();
 
+  console.log("Rendering MediaGallery with items:", items);
   if (items.length === 0) {
     return (
       <Empty>
@@ -46,7 +47,7 @@ export function MediaGallery({ items, isHidden = false }: MediaGalleryProps) {
     grid: "grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
     overlay:
       "grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
-    large: "flex flex-col items-center gap-8 max-w-2xl mx-auto",
+    large: "flex flex-col items-center gap-8 max-w-5xl mx-auto",
     masonry:
       "columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4",
   };

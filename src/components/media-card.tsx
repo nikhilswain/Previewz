@@ -12,6 +12,7 @@ import {
 import { Copy, Trash2, MoreVertical, Eye, Lock } from "lucide-react";
 import { toast } from "sonner";
 import type React from "react";
+import { Video } from "./video-preview";
 
 interface MediaCardProps {
   item: MediaItem;
@@ -75,7 +76,9 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
         <img
           src={validThumbnail}
           alt={item.name}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          className={`h-full w-full transition-transform duration-300 group-hover:scale-105 ${
+            layout === "large" ? "object-contain" : "object-cover"
+          }`}
           loading="lazy"
           decoding="async"
           onError={(e) => (e.currentTarget.src = "/media-placeholder.png")}
@@ -91,9 +94,20 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
         />
       );
     }
+
+    if (item.format === "video") {
+      return (
+        <Video
+          src={item.url}
+          title={item.name}
+          className="max-w-full rounded w-full h-full object-cover"
+        />
+      );
+    }
+
     return (
       <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-primary/20 to-secondary/20">
-        <div className="text-5xl">{item.format === "video" ? "▶" : "📎"}</div>
+        <div className="text-5xl">{"📎"}</div>
       </div>
     );
   };
@@ -154,7 +168,7 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
       wrapper:
         "group relative overflow-hidden rounded-lg bg-card cursor-pointer shadow-md hover:shadow-lg transition-all border border-border/50 hover:border-primary/50 flex flex-col",
       overlay: (
-        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
           {ActionButtons}
         </div>
       ),
@@ -165,10 +179,10 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
         "group relative aspect-square overflow-hidden rounded-lg bg-muted cursor-pointer shadow-md hover:shadow-lg transition-all border border-border/50 hover:border-primary/50",
       overlay: (
         <>
-          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
             {ActionButtons}
           </div>
-          <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/60 via-black/30 to-transparent p-3">
+          <div className="absolute top-0 left-0 right-0 bg-linear-to-b from-black/60 via-black/30 to-transparent p-3">
             <h3 className="font-semibold text-sm text-white line-clamp-2">
               {item.name}
             </h3>
@@ -178,7 +192,7 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
     },
     large: {
       wrapper:
-        "group relative overflow-hidden rounded-lg bg-card cursor-pointer shadow-md hover:shadow-lg transition-all border border-border/50 hover:border-primary/50 w-full",
+        "group relative overflow-hidden rounded-lg cursor-pointer shadow-md hover:shadow-lg transition-all hover:border-primary/50 w-full bg-transparent",
     },
     masonry: {
       wrapper:
