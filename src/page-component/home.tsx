@@ -10,6 +10,7 @@ import { SettingsButton } from "@/components/settings-button";
 import { FormatFilter } from "@/components/format-filter";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { getUrlFromPasteEvent, isEditableElement } from "@/lib/utils";
 
 export default function HomePage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -19,6 +20,21 @@ export default function HomePage() {
   const { items, allTags, allFormats, hiddenTags } = useMediaStore();
 
   useEffect(() => {
+    // Global paste to quickly add a URL unless user is typing into an input
+    const onPaste = (e: ClipboardEvent) => {
+      const active = document.activeElement;
+      if (isEditableElement(active)) return; // let native paste happen in inputs
+      const url = getUrlFromPasteEvent(e);
+      if (url) {
+        e.preventDefault();
+        sessionStorage.setItem("prefilledUrl", url);
+        setIsAddModalOpen(true);
+        toast.info("URL pasted", { description: "Ready to add media" });
+      }
+    };
+
+    document.addEventListener("paste", onPaste);
+
     // Process import data passed from settings page (sessionStorage)
     try {
       const raw = sessionStorage.getItem("importedData");
@@ -93,6 +109,7 @@ export default function HomePage() {
     document.addEventListener("drop", handleDrop);
 
     return () => {
+      document.removeEventListener("paste", onPaste);
       document.removeEventListener("dragover", handleDragOver);
       document.removeEventListener("drop", handleDrop);
     };
