@@ -85,6 +85,10 @@ type MediaStore = {
   importItems: (
     incoming: ImportableMedia[]
   ) => Promise<{ added: number; skipped: number }>;
+  // Overwrite existing data with incoming items (clears DB + hidden tags)
+  overwriteWithItems: (
+    incoming: ImportableMedia[]
+  ) => Promise<{ added: number }>;
   deleteItem: (id: string) => Promise<void>;
   updateItem: (
     id: string,
@@ -334,6 +338,101 @@ export const useMediaStore = create<MediaStore>((set, get) => {
       set({ items: next, ...computeDerived(next) });
 
       return { added: toAdd.length, skipped: incoming.length - toAdd.length };
+    },
+
+    overwriteWithItems: async (incoming) => {
+      const db = await openDB();
+
+      // Clear both stores in a single transaction
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME, HIDDEN_STORE_NAME], "readwrite");
+        tx.objectStore(STORE_NAME).clear();
+        tx.objectStore(HIDDEN_STORE_NAME).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+
+      // Also clear persisted hidden tags
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("hiddenTags");
+      }
+
+      // Reuse importItems logic to normalize + add (no duplicates now that DB cleared)
+      const result = await (async () => {
+        // compute full items from incoming (mirrors importItems without duplicate checks)
+        const toAdd: MediaItem[] = [];
+        for (const raw of incoming) {
+          const url = typeof raw.url === "string" ? raw.url : "";
+          if (!url) continue;
+
+          const typeCandidate = raw.type;
+          const type: MediaItem["type"] =
+            typeCandidate === "image" ||
+            typeCandidate === "video" ||
+            typeCandidate === "other"
+              ? typeCandidate
+              : "other";
+          const format = detectFormat(url, type);
+
+          let name: string;
+          if (typeof raw.name === "string" && raw.name.trim()) {
+            name = raw.name;
+          } else {
+            try {
+              name = new URL(url).hostname;
+            } catch {
+              name = "Untitled";
+            }
+          }
+
+          const id =
+            typeof raw.id === "string" && raw.id.trim()
+              ? raw.id
+              : Date.now().toString() + Math.random().toString(36).slice(2);
+          const createdAt =
+            typeof raw.createdAt === "number" ? raw.createdAt : Date.now();
+          const tags = Array.isArray(raw.tags)
+            ? raw.tags.filter((t): t is string => typeof t === "string")
+            : [];
+          const thumbnail =
+            typeof raw.thumbnail === "string" ? raw.thumbnail : undefined;
+
+          toAdd.push({
+            id,
+            url,
+            type,
+            format,
+            name,
+            tags,
+            thumbnail,
+            createdAt,
+            isHidden: false,
+          });
+        }
+
+        if (toAdd.length === 0) return { added: 0 };
+
+        await new Promise<void>((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, "readwrite");
+          const store = tx.objectStore(STORE_NAME);
+          for (const item of toAdd) store.add(item);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+
+        // Update memory to reflect only new items and reset hidden state
+        const next = [...toAdd].sort((a, b) => b.createdAt - a.createdAt);
+        set({
+          items: next,
+          hiddenItems: [],
+          hiddenTags: [],
+          ...computeDerived(next),
+        });
+
+        return { added: toAdd.length };
+      })();
+
+      return result;
     },
 
     deleteItem: async (id) => {

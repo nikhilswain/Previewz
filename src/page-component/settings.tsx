@@ -13,6 +13,8 @@ export default function SettingsPage() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [mounted, setMounted] = useState(false);
   const [openClearDialog, setOpenClearDialog] = useState(false);
+  const [openImportDialog, setOpenImportDialog] = useState(false);
+  const [pendingImport, setPendingImport] = useState<any[]>([]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
@@ -75,19 +77,38 @@ export default function SettingsPage() {
         throw new Error("Invalid backup file format");
       }
 
-      // Store imported items in localStorage for the main page to handle
-      sessionStorage.setItem("importedData", JSON.stringify(data.items));
-      window.location.href = "/";
-
-      toast.success("Import started", {
-        description: "Redirecting to add imported items...",
-      });
+      // If there are existing items, ask the user whether to merge or overwrite
+      if (items.length > 0) {
+        setPendingImport(data.items);
+        setOpenImportDialog(true);
+      } else {
+        // No existing items, proceed with overwrite-like behavior by default
+        sessionStorage.setItem("importedData", JSON.stringify(data.items));
+        sessionStorage.setItem("importMode", "overwrite");
+        window.location.href = "/";
+        toast.success("Import started", {
+          description: "Redirecting to add imported items...",
+        });
+      }
     } catch (error) {
       toast.error("Import failed", {
         description:
           error instanceof Error ? error.message : "Failed to import backup",
       });
     }
+  };
+
+  const proceedImport = (mode: "merge" | "overwrite") => {
+    sessionStorage.setItem("importedData", JSON.stringify(pendingImport));
+    sessionStorage.setItem("importMode", mode);
+    setOpenImportDialog(false);
+    window.location.href = "/";
+    toast.success("Import started", {
+      description:
+        mode === "overwrite"
+          ? "Overwriting existing data..."
+          : "Merging with existing data...",
+    });
   };
 
   const handleClearAll = () => {
@@ -133,6 +154,49 @@ export default function SettingsPage() {
               </Button>
               <Button variant="destructive" onClick={handleClearAll}>
                 Confirm
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import mode choice dialog */}
+      <Dialog open={openImportDialog} onOpenChange={setOpenImportDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>Existing Data Detected</DialogHeader>
+          <div className="space-y-4">
+            <p>
+              Your library already has {items.length} item(s). How would you
+              like to handle the import?
+            </p>
+            <ul className="list-disc ml-6 text-sm text-muted-foreground space-y-1">
+              <li>
+                Merge: Keep current items and add new ones (duplicates by URL
+                will be skipped).
+              </li>
+              <li>
+                Overwrite: Remove all current items and replace with the
+                imported items.
+              </li>
+            </ul>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setOpenImportDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => proceedImport("merge")}
+              >
+                Merge
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => proceedImport("overwrite")}
+              >
+                Overwrite
               </Button>
             </div>
           </div>

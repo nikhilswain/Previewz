@@ -22,17 +22,24 @@ export default function HomePage() {
     // Process import data passed from settings page (sessionStorage)
     try {
       const raw = sessionStorage.getItem("importedData");
+      const mode = sessionStorage.getItem("importMode"); // 'merge' | 'overwrite'
       if (raw) {
         const parsed = JSON.parse(raw);
+        const importMode = mode === "overwrite" ? "overwrite" : "merge";
+        const store = useMediaStore.getState();
         if (Array.isArray(parsed)) {
-          // call bulk import on the store
-          useMediaStore
-            .getState()
-            .importItems(parsed)
-            .then(({ added, skipped }) => {
-              toast.success("Import complete", {
-                description: `${added} added, ${skipped} skipped`,
-              });
+          const action =
+            importMode === "overwrite"
+              ? store.overwriteWithItems(parsed)
+              : store.importItems(parsed);
+
+          Promise.resolve(action)
+            .then((res: any) => {
+              const description =
+                importMode === "overwrite"
+                  ? `${res.added} added`
+                  : `${res.added} added, ${res.skipped} skipped`;
+              toast.success("Import complete", { description });
             })
             .catch(() => {
               toast.error("Import failed", {
@@ -41,13 +48,16 @@ export default function HomePage() {
             })
             .finally(() => {
               sessionStorage.removeItem("importedData");
+              sessionStorage.removeItem("importMode");
             });
         } else {
           sessionStorage.removeItem("importedData");
+          sessionStorage.removeItem("importMode");
         }
       }
     } catch {
       sessionStorage.removeItem("importedData");
+      sessionStorage.removeItem("importMode");
     }
 
     const handleDragOver = (e: DragEvent) => {
