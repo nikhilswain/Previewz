@@ -41,83 +41,22 @@ export function MediaGallery({ items, isHidden = false }: MediaGalleryProps) {
     );
   }
 
-  if (layout === "grid") {
-    return (
-      <>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {items.map((item) => (
-            <MediaCard
-              key={item.id}
-              item={item}
-              onClick={() => setSelectedItem(item)}
-              layout={layout}
-            />
-          ))}
-        </div>
-        {selectedItem && (
-          <PreviewModal
-            item={selectedItem}
-            onClose={() => setSelectedItem(null)}
-            isHidden={isHidden}
-          />
-        )}
-      </>
-    );
-  }
+  // lookup for layout-specific wrappers
+  const layoutClasses: Record<string, string> = {
+    grid: "grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+    overlay:
+      "grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
+    large: "flex flex-col items-center gap-8 max-w-2xl mx-auto",
+    masonry:
+      "columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4",
+  };
 
-  if (layout === "overlay") {
-    return (
-      <>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {items.map((item) => (
-            <MediaCard
-              key={item.id}
-              item={item}
-              onClick={() => setSelectedItem(item)}
-              layout={layout}
-            />
-          ))}
-        </div>
-        {selectedItem && (
-          <PreviewModal
-            item={selectedItem}
-            onClose={() => setSelectedItem(null)}
-            isHidden={isHidden}
-          />
-        )}
-      </>
-    );
-  }
+  // fallback layout class if invalid layout value
+  const containerClass = layoutClasses[layout] ?? layoutClasses.masonry;
 
-  if (layout === "large") {
-    return (
-      <>
-        <div className="flex flex-col items-center gap-8 max-w-2xl mx-auto">
-          {items.map((item) => (
-            <MediaCard
-              key={item.id}
-              item={item}
-              onClick={() => setSelectedItem(item)}
-              layout={layout}
-            />
-          ))}
-        </div>
-        {selectedItem && (
-          <PreviewModal
-            item={selectedItem}
-            onClose={() => setSelectedItem(null)}
-            isHidden={isHidden}
-          />
-        )}
-      </>
-    );
-  }
-
-  // Masonry layout
-  return (
-    <>
-      <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4">
-        {items.map((item) => (
+  const renderItems = () =>
+    layout === "masonry"
+      ? items.map((item) => (
           <div key={item.id} className="break-inside-avoid mb-4">
             <MediaCard
               item={item}
@@ -125,8 +64,20 @@ export function MediaGallery({ items, isHidden = false }: MediaGalleryProps) {
               layout={layout}
             />
           </div>
-        ))}
-      </div>
+        ))
+      : items.map((item) => (
+          <MediaCard
+            key={item.id}
+            item={item}
+            onClick={() => setSelectedItem(item)}
+            layout={layout}
+          />
+        ));
+
+  return (
+    <>
+      <div className={containerClass}>{renderItems()}</div>
+
       {selectedItem && (
         <PreviewModal
           item={selectedItem}
