@@ -25,10 +25,15 @@ import { detectMediaTypeFromUrl } from "@/lib/utils";
 interface AddMediaModalProps {
   isOpen: boolean;
   onClose: () => void;
+  target?: "public" | "hidden";
 }
 
-export function AddMediaModal({ isOpen, onClose }: AddMediaModalProps) {
-  const { addItem, allTags } = useMediaStore();
+export function AddMediaModal({
+  isOpen,
+  onClose,
+  target = "public",
+}: AddMediaModalProps) {
+  const { addItem, addHiddenItem, allTags } = useMediaStore();
   const [url, setUrl] = useState("");
   const [name, setName] = useState("");
   const [type, setType] = useState<"image" | "video" | "other">("image");
@@ -48,6 +53,12 @@ export function AddMediaModal({ isOpen, onClose }: AddMediaModalProps) {
         }
         sessionStorage.removeItem("prefilledUrl");
       }
+      // reset transient flags on open
+      setIsLoading(false);
+      setError("");
+    } else {
+      // when closing, ensure loading resets so next open is clean
+      setIsLoading(false);
     }
   }, [isOpen]);
 
@@ -115,28 +126,32 @@ export function AddMediaModal({ isOpen, onClose }: AddMediaModalProps) {
     setIsLoading(true);
 
     try {
-      // Try to fetch thumbnail for images
+      // For images, we can optimistically set the URL as thumbnail
       let thumbnail: string | undefined;
+      if (type === "image") thumbnail = url;
 
-      if (type === "image") {
-        try {
-          const response = await fetch(url, { method: "HEAD" });
-          if (response.ok) {
-            thumbnail = url;
-          }
-        } catch {
-          // If fetch fails, use the URL as is
-          thumbnail = url;
-        }
+      const hasNSFW = tags.some((t) => t.trim().toLowerCase() === "nsfw");
+      const isHiddenTarget = target === "hidden" || hasNSFW;
+
+      if (hasNSFW) {
+        // subtle inline notice via toast to avoid larger UI changes
+        // eslint-disable-next-line no-console
+        console.info("NSFW tag detected: routing to hidden vault");
       }
 
-      await addItem({
+      const payload = {
         url,
         name: name || new URL(url).hostname,
         type,
         tags,
         thumbnail,
-      });
+      } as const;
+
+      if (isHiddenTarget) {
+        await addHiddenItem(payload as any);
+      } else {
+        await addItem(payload as any);
+      }
 
       // Reset form
       setUrl("");
@@ -154,7 +169,12 @@ export function AddMediaModal({ isOpen, onClose }: AddMediaModalProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add Media</DialogTitle>
@@ -233,7 +253,12 @@ export function AddMediaModal({ isOpen, onClose }: AddMediaModalProps) {
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              At least one tag is required
+              At least one tag is required{` `}
+              {tagsInput.toLowerCase().includes("nsfw") && (
+                <span className="text-amber-600">
+                  • NSFW detected — item will be added to Hidden Vault
+                </span>
+              )}
             </p>
           </div>
 

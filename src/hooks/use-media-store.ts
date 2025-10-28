@@ -81,6 +81,9 @@ type MediaStore = {
   addItem: (
     item: Omit<MediaItem, "id" | "createdAt" | "format">
   ) => Promise<void>;
+  addHiddenItem: (
+    item: Omit<MediaItem, "id" | "createdAt" | "format">
+  ) => Promise<void>;
   // Bulk import items (e.g., from backup). Returns counts of added/skipped
   importItems: (
     incoming: ImportableMedia[]
@@ -224,6 +227,35 @@ export const useMediaStore = create<MediaStore>((set, get) => {
         // rollback on failure
         const rolledBack = get().items.filter((i) => i.id !== newItem.id);
         set({ items: rolledBack, ...computeDerived(rolledBack) });
+        throw err;
+      });
+    },
+
+    addHiddenItem: async (item) => {
+      const db = await openDB();
+      const format = detectFormat(item.url, item.type);
+      const newItem: MediaItem = {
+        ...item,
+        format,
+        id: Date.now().toString(),
+        createdAt: Date.now(),
+        isHidden: true,
+      };
+
+      // optimistic update
+      const prev = get().hiddenItems;
+      const optimistic = [newItem, ...prev];
+      set({ hiddenItems: optimistic });
+
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(HIDDEN_STORE_NAME, "readwrite");
+        const store = tx.objectStore(HIDDEN_STORE_NAME);
+        store.add(newItem);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }).catch((err) => {
+        const rolledBack = get().hiddenItems.filter((i) => i.id !== newItem.id);
+        set({ hiddenItems: rolledBack });
         throw err;
       });
     },

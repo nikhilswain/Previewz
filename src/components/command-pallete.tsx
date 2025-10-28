@@ -14,12 +14,16 @@ interface CommandPaletteProps {
   items: MediaItem[];
   onSearch: (query: string) => void;
   searchQuery: string;
+  otherScopeCountLabel?: string;
+  otherScopeCount?: number;
 }
 
 export function CommandPalette({
   items,
   onSearch,
   searchQuery,
+  otherScopeCount,
+  otherScopeCountLabel,
 }: CommandPaletteProps) {
   const [open, setOpen] = useState(false);
 
@@ -53,6 +57,11 @@ export function CommandPalette({
         />
         <CommandList>
           <CommandEmpty>No media found.</CommandEmpty>
+          {otherScopeCount && otherScopeCount > 0 && (
+            <div className="px-3 py-2 text-xs text-muted-foreground">
+              {otherScopeCount} {otherScopeCountLabel || "in other vault"}
+            </div>
+          )}
           <CommandGroup heading="Media">
             {filteredItems.map((item) => (
               <CommandItem

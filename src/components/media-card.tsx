@@ -18,10 +18,24 @@ interface MediaCardProps {
   item: MediaItem;
   onClick: () => void;
   layout?: LayoutType;
+  isHiddenPage?: boolean;
+  blurMedia?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectToggle?: (checked: boolean) => void;
 }
 
-export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
-  const { deleteItem, hideItem } = useMediaStore();
+export function MediaCard({
+  item,
+  onClick,
+  layout = "grid",
+  isHiddenPage = false,
+  blurMedia = false,
+  selectable = false,
+  selected = false,
+  onSelectToggle,
+}: MediaCardProps) {
+  const { deleteItem, hideItem, unhideItem } = useMediaStore();
   const [isDeleting, setIsDeleting] = useState(false);
   const [validThumbnail, setValidThumbnail] = useState<string | null>(null);
 
@@ -58,6 +72,16 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
       toast.success("Hidden!", { description: "Media moved to hidden vault" });
     } catch {
       toast.error("Error", { description: "Failed to hide media" });
+    }
+  };
+
+  const handleUnhide = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await unhideItem(item.id);
+      toast.success("Unhidden!", { description: "Media moved to public" });
+    } catch {
+      toast.error("Error", { description: "Failed to unhide media" });
     }
   };
 
@@ -114,6 +138,25 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
 
   const ActionButtons = (
     <>
+      {isHiddenPage ? (
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={handleUnhide}
+          className="h-7 w-7 p-0 bg-white/90 hover:bg-white text-black"
+        >
+          <Lock className="h-3.5 w-3.5" />
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={handleHide}
+          className="h-7 w-7 p-0 bg-white/90 hover:bg-white text-black"
+        >
+          <Lock className="h-3.5 w-3.5" />
+        </Button>
+      )}
       <Button
         size="sm"
         variant="secondary"
@@ -144,9 +187,15 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
           <DropdownMenuItem onClick={handleCopyUrl}>
             <Copy className="mr-2 h-4 w-4" /> Copy URL
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleHide}>
-            <Lock className="mr-2 h-4 w-4" /> Hide
-          </DropdownMenuItem>
+          {isHiddenPage ? (
+            <DropdownMenuItem onClick={handleUnhide}>
+              <Lock className="mr-2 h-4 w-4" /> Unhide
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={handleHide}>
+              <Lock className="mr-2 h-4 w-4" /> Hide
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onClick={handleDelete}
             disabled={isDeleting}
@@ -208,10 +257,32 @@ export function MediaCard({ item, onClick, layout = "grid" }: MediaCardProps) {
   const { wrapper, overlay, showDetails } = layoutMap[layout] ?? layoutMap.grid;
 
   // ---------- final render ----------
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (selectable && onSelectToggle) {
+      e.stopPropagation();
+      onSelectToggle(!selected);
+      return;
+    }
+    onClick();
+  };
+
   return (
-    <div className={wrapper} onClick={onClick}>
-      <div className="relative w-full aspect-square bg-muted overflow-hidden">
-        {renderMedia()}
+    <div className={wrapper} onClick={handleCardClick}>
+      <div className={`relative w-full aspect-square bg-muted overflow-hidden`}>
+        {selectable && (
+          <div className="absolute top-2 left-2 z-10">
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={selected}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => onSelectToggle?.(e.target.checked)}
+            />
+          </div>
+        )}
+        <div className={blurMedia ? "filter blur-sm" : undefined}>
+          {renderMedia()}
+        </div>
         {overlay}
       </div>
 

@@ -15,9 +15,20 @@ import { BoxIcon } from "lucide-react";
 interface MediaGalleryProps {
   items: MediaItem[];
   isHidden?: boolean;
+  blurAll?: boolean;
+  selectable?: boolean;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string, checked: boolean) => void;
 }
 
-export function MediaGallery({ items, isHidden = false }: MediaGalleryProps) {
+export function MediaGallery({
+  items,
+  isHidden = false,
+  blurAll = false,
+  selectable = false,
+  selectedIds = [],
+  onToggleSelect,
+}: MediaGalleryProps) {
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
   const { layout } = useLayoutStore();
 
@@ -63,6 +74,11 @@ export function MediaGallery({ items, isHidden = false }: MediaGalleryProps) {
               item={item}
               onClick={() => setSelectedItem(item)}
               layout={layout}
+              isHiddenPage={isHidden}
+              blurMedia={blurAll}
+              selectable={selectable}
+              selected={selectedIds.includes(item.id)}
+              onSelectToggle={(checked) => onToggleSelect?.(item.id, checked)}
             />
           </div>
         ))
@@ -72,6 +88,11 @@ export function MediaGallery({ items, isHidden = false }: MediaGalleryProps) {
             item={item}
             onClick={() => setSelectedItem(item)}
             layout={layout}
+            isHiddenPage={isHidden}
+            blurMedia={blurAll}
+            selectable={selectable}
+            selected={selectedIds.includes(item.id)}
+            onSelectToggle={(checked) => onToggleSelect?.(item.id, checked)}
           />
         ));
 

@@ -1,0 +1,13 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { ThemeProvider } from '@/components/theme-provider';
+import HiddenPage from '@/page-component/hidden';
+import { Toaster } from 'sonner';
+---
+
+<Layout>
+  <ThemeProvider client:only="react">
+    <HiddenPage client:only="react" />
+    <Toaster richColors position="top-right" client:only="react" />
+  </ThemeProvider>
+</Layout>

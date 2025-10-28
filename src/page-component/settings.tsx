@@ -7,14 +7,24 @@ import { useMediaStore } from "@/hooks/use-media-store";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+import { useVaultStore } from "@/hooks/use-vault-store";
+import { verifyPasscode } from "@/lib/crypto";
 
 export default function SettingsPage() {
-  const { items } = useMediaStore();
+  const { items, hiddenItems } = useMediaStore();
+  const { config, rememberTTL, setRememberTTL, lock } = useVaultStore();
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [mounted, setMounted] = useState(false);
   const [openClearDialog, setOpenClearDialog] = useState(false);
   const [openImportDialog, setOpenImportDialog] = useState(false);
   const [pendingImport, setPendingImport] = useState<any[]>([]);
+  const [openExportDialog, setOpenExportDialog] = useState(false);
+  const [otp, setOtp] = useState("");
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
@@ -42,14 +52,40 @@ export default function SettingsPage() {
     });
   };
 
-  const handleExport = () => {
-    const dataToExport = {
-      version: "1.0",
+  const triggerExport = () => {
+    if (hiddenItems.length > 0) {
+      setOpenExportDialog(true);
+    } else {
+      doExport(false);
+    }
+  };
+
+  const doExport = async (includeHidden: boolean) => {
+    if (includeHidden) {
+      if (!config) {
+        toast.error("Hidden vault not configured");
+        return;
+      }
+      if (otp.length !== 5) {
+        toast.error("Enter 5-digit passcode");
+        return;
+      }
+      const ok = await verifyPasscode(otp, config);
+      if (!ok) {
+        toast.error("Invalid passcode");
+        return;
+      }
+    }
+
+    const payload: any = {
+      version: "1.1",
       exportedAt: new Date().toISOString(),
       items,
     };
+    if (includeHidden) payload.hiddenItems = hiddenItems;
+    if (config) payload.vaultConfig = config;
 
-    const dataStr = JSON.stringify(dataToExport, null, 2);
+    const dataStr = JSON.stringify(payload, null, 2);
     const dataBlob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
@@ -61,8 +97,13 @@ export default function SettingsPage() {
     URL.revokeObjectURL(url);
 
     toast.success("Export successful", {
-      description: `Exported ${items.length} media items`,
+      description: includeHidden
+        ? `Exported ${items.length + hiddenItems.length} items (with hidden)`
+        : `Exported ${items.length} public items`,
     });
+
+    setOpenExportDialog(false);
+    setOtp("");
   };
 
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,13 +118,17 @@ export default function SettingsPage() {
         throw new Error("Invalid backup file format");
       }
 
+      // If backup contains hidden items or a vault config, we’ll route via Home to perform import there (reuse existing mechanism);
+      // we store the whole payload and the mode in sessionStorage for Home to process.
+      const payload = data;
+
       // If there are existing items, ask the user whether to merge or overwrite
       if (items.length > 0) {
-        setPendingImport(data.items);
+        setPendingImport(payload.items);
         setOpenImportDialog(true);
       } else {
         // No existing items, proceed with overwrite-like behavior by default
-        sessionStorage.setItem("importedData", JSON.stringify(data.items));
+        sessionStorage.setItem("importedData", JSON.stringify(payload));
         sessionStorage.setItem("importMode", "overwrite");
         window.location.href = "/";
         toast.success("Import started", {
@@ -99,7 +144,11 @@ export default function SettingsPage() {
   };
 
   const proceedImport = (mode: "merge" | "overwrite") => {
-    sessionStorage.setItem("importedData", JSON.stringify(pendingImport));
+    // Store full payload (we only saved items in pendingImport, but we’ll reconstruct minimal payload)
+    const payload = {
+      items: pendingImport,
+    } as any;
+    sessionStorage.setItem("importedData", JSON.stringify(payload));
     sessionStorage.setItem("importMode", mode);
     setOpenImportDialog(false);
     window.location.href = "/";
@@ -155,6 +204,56 @@ export default function SettingsPage() {
               <Button variant="destructive" onClick={handleClearAll}>
                 Confirm
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export dialog if hidden items exist */}
+      <Dialog open={openExportDialog} onOpenChange={setOpenExportDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>Export Data</DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm">
+              Hidden items detected ({hiddenItems.length}). Choose what to
+              export:
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="bg-transparent"
+                onClick={() => doExport(false)}
+              >
+                Public only
+              </Button>
+              <Button
+                onClick={() => {
+                  /* wait for otp below */
+                }}
+                disabled
+              >
+                Export all
+              </Button>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Passcode required to export hidden items
+              </p>
+              <InputOTP maxLength={5} value={otp} onChange={setOtp}>
+                <InputOTPGroup>
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <InputOTPSlot key={i} index={i} />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => doExport(true)}
+                  disabled={otp.length !== 5}
+                >
+                  Export all (with hidden)
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -260,6 +359,34 @@ export default function SettingsPage() {
                 Data Management
               </h2>
               <div className="space-y-4">
+                {/* Hidden Vault Session */}
+                <div className="flex items-center justify-between pb-4 border-b border-border/40">
+                  <div>
+                    <p className="font-medium text-foreground">
+                      Hidden Vault Session
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Remember unlock for 20 minutes in this session. If off,
+                      passcode is required every time.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={rememberTTL}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setRememberTTL(next);
+                        // Clear any existing session unlock whenever toggled
+                        try {
+                          sessionStorage.removeItem("vaultUnlockedUntil");
+                        } catch {}
+                        lock();
+                      }}
+                    />
+                    {rememberTTL ? "On" : "Off"}
+                  </label>
+                </div>
                 {/* Export */}
                 <div className="flex items-center justify-between pb-4 border-b border-border/40">
                   <div>
@@ -271,7 +398,7 @@ export default function SettingsPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleExport}
+                    onClick={triggerExport}
                     className="gap-2 bg-transparent"
                   >
                     <Download className="h-4 w-4" />
