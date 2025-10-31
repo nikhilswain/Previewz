@@ -280,7 +280,7 @@ export function MediaCard({
             />
           </div>
         )}
-        <div className={blurMedia ? "filter blur-sm" : undefined}>
+        <div className={`${blurMedia ? "filter blur-sm" : ""} h-full`}>
           {renderMedia()}
         </div>
         {overlay}

@@ -112,7 +112,7 @@ export function PreviewModal({
                   src={item.url}
                   title={item.name}
                   className="w-full h-96 rounded border border-border"
-                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                  sandbox=""
                 />
               </div>
             ) : item.format === "document" ? (
