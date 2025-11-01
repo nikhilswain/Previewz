@@ -19,7 +19,7 @@ export function LayoutSwitcher() {
   const { layout, setLayout } = useLayoutStore();
 
   return (
-    <div className="flex gap-2 rounded-lg bg-muted p-1">
+    <div className="flex gap-2 rounded-lg bg-muted p-1 justify-evenly w-full sm:w-auto">
       {layouts.map(({ type, label, icon }) => (
         <Button
           key={type}

@@ -360,6 +360,15 @@ export default function HomePage() {
           </div>
 
           <div className="flex flex-col gap-4">
+            {/* tags filters */}
+            {visibleTags.length > 0 && (
+              <TagFilter
+                tags={visibleTags}
+                selectedTags={selectedTags}
+                onTagChange={setSelectedTags}
+              />
+            )}
+
             <div className="flex items-center gap-2">
               <Button
                 variant={selectMode ? "secondary" : "outline"}
@@ -375,13 +384,8 @@ export default function HomePage() {
                 </Button>
               )}
             </div>
-            {visibleTags.length > 0 && (
-              <TagFilter
-                tags={visibleTags}
-                selectedTags={selectedTags}
-                onTagChange={setSelectedTags}
-              />
-            )}
+
+            {/* format filters */}
             {allFormats.length > 0 && (
               <FormatFilter
                 formats={allFormats}

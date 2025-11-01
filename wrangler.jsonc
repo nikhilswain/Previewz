@@ -1,16 +1,13 @@
 {
-	"main": "dist/_worker.js/index.js",
-	"name": "",
-  "compatibility_date": "2025-10-24",
-  "compatibility_flags": [
-    "nodejs_compat",
-    "global_fetch_strictly_public"
-  ],
-	"assets": {
-		"binding": "ASSETS",
-		"directory": "./dist"
-	},
-	"observability": {
+  "main": "dist/_worker.js/index.js",
+  "name": "previewz",
+  "compatibility_date": "2025-01-11",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist"
+  },
+  "observability": {
     "enabled": true
   }
 }

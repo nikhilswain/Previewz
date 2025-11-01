@@ -21,12 +21,13 @@ function DropdownMenuPortal({
 }
 
 function DropdownMenuTrigger({
+  className,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
   return (
     <DropdownMenuPrimitive.Trigger
       data-slot="dropdown-menu-trigger"
-      className="dark:hover:bg-accent"
+      className={cn("dark:hover:bg-accent", className)}
       {...props}
     />
   );

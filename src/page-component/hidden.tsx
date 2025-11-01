@@ -22,6 +22,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 
 function HiddenGate({ children }: { children: React.ReactNode }) {
   const {
@@ -242,7 +243,7 @@ export default function HiddenPage() {
                   Only visible when unlocked
                 </p>
               </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-baseline gap-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:flex-none sm:w-64">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                   <input
@@ -252,13 +253,14 @@ export default function HiddenPage() {
                     className="w-full pl-10 pr-4 py-2 rounded-md bg-muted/50 border border-muted-foreground/20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border/40">
+
+                <div className="flex items-center gap-2 px-3 py-2">
                   <span className="text-sm">Blur</span>
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
+                  <Switch
+                    className="border-muted-foreground/20 bg-muted/50 cursor-pointer"
+                    id="blur-hidden-switch"
                     checked={blurHidden}
-                    onChange={(e) => setBlurHidden(e.target.checked)}
+                    onCheckedChange={(checked) => setBlurHidden(checked)}
                   />
                 </div>
               </div>
@@ -273,6 +275,14 @@ export default function HiddenPage() {
             </div>
 
             <div className="flex flex-col gap-4">
+              {hiddenTags.length > 0 && (
+                <TagFilter
+                  tags={hiddenTags}
+                  selectedTags={selectedTags}
+                  onTagChange={setSelectedTags}
+                />
+              )}
+
               <div className="flex items-center gap-2">
                 <Button
                   variant={selectMode ? "secondary" : "outline"}
@@ -288,13 +298,7 @@ export default function HiddenPage() {
                   </Button>
                 )}
               </div>
-              {hiddenTags.length > 0 && (
-                <TagFilter
-                  tags={hiddenTags}
-                  selectedTags={selectedTags}
-                  onTagChange={setSelectedTags}
-                />
-              )}
+
               {hiddenFormats.length > 0 && (
                 <FormatFilter
                   formats={hiddenFormats}
