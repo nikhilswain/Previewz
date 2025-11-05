@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/input-otp";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 
 function HiddenGate({ children }: { children: React.ReactNode }) {
   const {
@@ -68,7 +69,20 @@ function HiddenGate({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <Dialog open={open} onOpenChange={() => {}}>
+      <Dialog
+        open={open}
+        onOpenChange={() => {
+          setOpen(!open);
+          if (open) {
+            setValue("");
+            setSetupValue("");
+            setSetupStep(0);
+          } else {
+            lock();
+          }
+          window.location.href = "/";
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           {!config ? (
             <>
@@ -130,10 +144,10 @@ function HiddenGate({ children }: { children: React.ReactNode }) {
                   </InputOTPGroup>
                 </InputOTP>
                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={rememberTTL}
-                    onChange={(e) => setRememberTTL(e.target.checked)}
+                    onCheckedChange={(checked) => setRememberTTL(!!checked)}
+                    className="border-muted-foreground checked:bg-primary"
                   />
                   Remember for 20 minutes (this session)
                 </label>

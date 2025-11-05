@@ -16,6 +16,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Select } from "./ui/select";
+import { Checkbox } from "./ui/checkbox";
 
 interface FormatFilterProps {
   formats: string[];
@@ -71,11 +73,10 @@ export function FormatFilter({
               className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-muted cursor-pointer transition-colors"
               onClick={() => toggleFormat(format)}
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={selectedFormats.includes(format)}
-                onChange={() => {}}
-                className="rounded border-muted-foreground"
+                onCheckedChange={() => toggleFormat(format)}
+                className="border-muted-foreground checked:bg-primary"
               />
               <span className="text-muted-foreground">
                 {formatIcons[format]}

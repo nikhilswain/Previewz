@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/input-otp";
 import { useVaultStore } from "@/hooks/use-vault-store";
 import { verifyPasscode } from "@/lib/crypto";
+import { Checkbox } from "@/components/ui/checkbox";
+
+// TODO: apply a gap b/w texts and actions, break line with max-width [400px]
 
 export default function SettingsPage() {
   const { items, hiddenItems } = useMediaStore();
@@ -365,18 +368,17 @@ export default function SettingsPage() {
                     <p className="font-medium text-foreground">
                       Hidden Vault Session
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground wrap-break-word max-w-[400px]">
                       Remember unlock for 20 minutes in this session. If off,
                       passcode is required every time.
                     </p>
                   </div>
                   <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
+                    <Checkbox
+                      className="border-muted-foreground checked:bg-primary"
                       checked={rememberTTL}
-                      onChange={(e) => {
-                        const next = e.target.checked;
-                        setRememberTTL(next);
+                      onCheckedChange={(checked) => {
+                        setRememberTTL(!!checked);
                         // Clear any existing session unlock whenever toggled
                         try {
                           sessionStorage.removeItem("vaultUnlockedUntil");

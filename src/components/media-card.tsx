@@ -13,6 +13,7 @@ import { Copy, Trash2, MoreVertical, Eye, Lock } from "lucide-react";
 import { toast } from "sonner";
 import type React from "react";
 import { Video } from "./video-preview";
+import { Checkbox } from "./ui/checkbox";
 
 interface MediaCardProps {
   item: MediaItem;
@@ -271,12 +272,11 @@ export function MediaCard({
       <div className={`relative w-full aspect-square bg-muted overflow-hidden`}>
         {selectable && (
           <div className="absolute top-2 left-2 z-10">
-            <input
-              type="checkbox"
-              className="h-4 w-4"
+            <Checkbox
               checked={selected}
+              onCheckedChange={() => onSelectToggle?.(!selected)}
               onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onSelectToggle?.(e.target.checked)}
+              className="border-neutral-50 checked:bg-primary"
             />
           </div>
         )}
