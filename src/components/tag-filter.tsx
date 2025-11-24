@@ -28,9 +28,9 @@ export function TagFilter({ tags, selectedTags, onTagChange }: TagFilterProps) {
             variant="ghost"
             size="sm"
             onClick={() => onTagChange([])}
-            className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+            className="cursor-pointer h-auto px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded-3xl"
           >
-            Clear all
+            Clear All
           </Button>
         )}
       </div>

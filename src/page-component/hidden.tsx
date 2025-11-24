@@ -301,7 +301,10 @@ export default function HiddenPage() {
                 <Button
                   variant={selectMode ? "secondary" : "outline"}
                   size="sm"
-                  onClick={() => setSelectMode((v) => !v)}
+                  onClick={() => {
+                    setSelectMode((v) => !v);
+                    setSelectedIds([]);
+                  }}
                   className="bg-transparent"
                 >
                   {selectMode ? "Cancel Selection" : "Select"}

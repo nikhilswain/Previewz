@@ -373,7 +373,10 @@ export default function HomePage() {
               <Button
                 variant={selectMode ? "secondary" : "outline"}
                 size="sm"
-                onClick={() => setSelectMode((v) => !v)}
+                onClick={() => {
+                  setSelectMode(!selectMode);
+                  setSelectedIds([]);
+                }}
                 className="bg-transparent"
               >
                 {selectMode ? "Cancel Selection" : "Select"}
