@@ -54,7 +54,7 @@ export function FormatFilter({
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild className="max-w-fit">
+      <DropdownMenuTrigger asChild className="max-w-[150px]">
         <Button variant="outline" size="sm" className="gap-2 bg-transparent">
           <span className="text-sm font-medium">Format</span>
           {selectedFormats.length > 0 && (
